@@ -27,7 +27,7 @@ app.MapGet("/api/devices", () =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error with getting all devices", statusCode: 500);
+        return Results.Problem("Error with getting all devices");
     }
 });
 
@@ -44,7 +44,7 @@ app.MapGet("/api/devices/{id}", (string id) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error occured when finding device", statusCode: 500);
+        return Results.Problem("Error occured when finding device");
     }
 });
 
@@ -57,7 +57,7 @@ app.MapPost("/api/devices/pc", (PersonalComputer pc) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when adding device", statusCode: 500);
+        return Results.Problem("Error when adding device");
     }
 });
 
@@ -70,7 +70,7 @@ app.MapPost("/api/devices/smartwatch", (Smartwatch watch) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when adding device", statusCode: 500);
+        return Results.Problem("Error when adding device");
     }
 });
 
@@ -83,7 +83,7 @@ app.MapPost("/api/devices/embedded", (Embedded ed) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when adding device", statusCode: 500);
+        return Results.Problem("Error when adding device");
     }
 });
 
@@ -96,7 +96,7 @@ app.MapPut("/api/devices/pc", (PersonalComputer pc) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when updating device", statusCode: 500);
+        return Results.Problem("Error when updating device");
     }
 });
 
@@ -109,7 +109,7 @@ app.MapPut("/api/devices/smartwatch", (Smartwatch sw) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when updating device", statusCode: 500);
+        return Results.Problem("Error when updating device");
     }
 });
 
@@ -122,7 +122,7 @@ app.MapPut("/api/devices/embedded", (Embedded ed) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when updating device", statusCode: 500);
+        return Results.Problem("Error when updating device");
     }
 });
 
@@ -135,7 +135,7 @@ app.MapDelete("/api/devices/{id}", (string id) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when deleting device", statusCode: 500);
+        return Results.Problem("Error when deleting device");
     }
 });
 
