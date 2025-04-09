@@ -1,0 +1,6 @@
+SW-1,Apple Watch SE2,True,27%
+P-1,LinuxPC,False,Linux Mint
+P-2,Mac,False,MacOS
+ED-200,NewED,True,192.168.0.5,MD Ltd. LAN
+P-3,test,True,string
+SW-20,KKK,True,0%
