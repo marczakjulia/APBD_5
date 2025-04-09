@@ -19,6 +19,7 @@ app.UseHttpsRedirection();
 
 var deviceManager = DeviceManagerCreation.CreateDeviceManager("/Users/juliamarczak/RiderProjects/APBD_5/src/APBDLogic /input.txt");
 
+//i have added the results. as you asked using the Results.OK/Problem/Created ect. hopefully this is what should have been done :)
 app.MapGet("/api/devices", () =>
 {
     try
