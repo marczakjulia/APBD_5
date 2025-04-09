@@ -474,7 +474,7 @@ $RECYCLE.BIN/
 *.cab
 *.msi
 *.msix
-*.msm
+*.msmr
 *.msp
 
 # Windows shortcuts
