@@ -1,6 +1,11 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using APBD5;
 
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("UniversityDatabase");
+builder.Services.AddTransient<IDeviceService,DeviceService >(
+    _ => new DeviceService(connectionString));
 
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();
@@ -17,26 +22,25 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var deviceManager = DeviceManagerCreation.CreateDeviceManager("/Users/juliamarczak/RiderProjects/APBD_5/src/APBDLogic /input.txt");
 
-//i have added the results. as you asked using the Results.OK/Problem/Created ect. hopefully this is what should have been done :)
-app.MapGet("/api/devices", () =>
+
+app.MapGet("/api/devices", (IDeviceService deviceService) =>
 {
     try
     {
-        return Results.Ok(deviceManager.GetAllDevices());
+        return Results.Ok(deviceService.GetAllDevices());
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error with getting all devices");
+        return Results.Problem(ex.Message);
     }
 });
 
-app.MapGet("/api/devices/{id}", (string id) =>
+app.MapGet("/api/devices/{id}", (string id, IDeviceService deviceService) =>
 {
     try
     {
-        var device = deviceManager.GetDeviceById(id);
+        var device = deviceService.GetDeviceById(id);
         if (device == null)
         {
             return Results.NotFound("Device not found");
@@ -45,54 +49,90 @@ app.MapGet("/api/devices/{id}", (string id) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error occured when finding device");
+        return Results.Problem(ex.Message);
     }
 });
 
-app.MapPost("/api/devices/pc", (PersonalComputer pc) =>
+app.MapPost("/api/devices", async (HttpRequest request, IDeviceService deviceService) =>
 {
     try
     {
-        deviceManager.AddDevice(pc);
-        return Results.Created($"/api/devices/{pc.Id}", pc);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem("Error when adding device");
-    }
-});
+        string? contentType = request.ContentType?.ToLower();
+        
+        if (contentType == "application/json")
+        {
+            using var reader = new StreamReader(request.Body);
+            string rawJson = await reader.ReadToEndAsync();
+            var json = JsonNode.Parse(rawJson);
+            var deviceData = json?["typeValue"];
+            if (deviceData != null)
+            {
+                if (json?["deviceType"]?.ToString() == "PC")
+                {
+                    var pc = JsonSerializer.Deserialize<PersonalComputer>(deviceData.ToString());
+                    if (pc == null) return Results.BadRequest("Invalid PC data");
+                    bool created = deviceService.Create(pc);
+                    if (created)
+                        return Results.Created($"/api/devices/{pc.Id}", pc);
+                    else
+                        return Results.BadRequest("Device with this ID already exists.");
+                }
+                else if (json?["deviceType"]?.ToString() == "Smartwatch")
+                {
+                    var watch = JsonSerializer.Deserialize<Smartwatch>(deviceData.ToString());
+                    if (watch == null) return Results.BadRequest("Invalid Smartwatch data");
+                    bool created = deviceService.Create(watch);
+                    if (created)
+                        return Results.Created($"/api/devices/{watch.Id}", watch);
+                    else
+                        return Results.BadRequest("Device with this ID already exists.");
+                }
+                else if (json?["deviceType"]?.ToString() == "Embedded")
+                {
+                    var embedded = JsonSerializer.Deserialize<Embedded>(deviceData.ToString());
+                    if (embedded == null) return Results.BadRequest("Invalid Embedded device data");
+                    bool created = deviceService.Create(embedded);
+                    if (created)
+                        return Results.Created($"/api/devices/{embedded.Id}", embedded);
+                    else
+                        return Results.BadRequest("Device with this ID already exists.");
+                }
+                else
+                {
+                    return Results.BadRequest("Unknown device type");
+                }
+            }
+            return Results.BadRequest("Device data not provided.");
+        }
+        else if (contentType == "text/plain")
+        {
+            // Handle plain text input (similar logic as for JSON)
+            using var reader = new StreamReader(request.Body);
+            string rawText = await reader.ReadToEndAsync();
 
-app.MapPost("/api/devices/smartwatch", (Smartwatch watch) =>
-{
-    try
-    {
-        deviceManager.AddDevice(watch);
-        return Results.Created($"/api/devices/{watch.Id}", watch);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem("Error when adding device");
-    }
-});
+            // Process plain text data here
+            // (You can adjust how you handle plain text depending on your needs)
+            var device = new PersonalComputer(rawText, rawText, true, "Windows");
+            deviceService.Create(device);
 
-app.MapPost("/api/devices/embedded", (Embedded ed) =>
-{
-    try
-    {
-        deviceManager.AddDevice(ed);
-        return Results.Created($"/api/devices/{ed.Id}", ed);
+            return Results.Created($"/api/devices/{device.Id}", device);
+        }
+        else
+        {
+            return Results.BadRequest("Unsupported content type");
+        }
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when adding device");
+        return Results.Problem("Error processing request: " + ex.Message);
     }
-});
+})
+.Accepts<string>("application/json", "text/plain"); 
 
 app.MapPut("/api/devices/pc", (PersonalComputer pc) =>
 {
     try
     {
-        deviceManager.EditDevice(pc);
         return Results.NoContent();
     }
     catch (Exception ex)
@@ -105,7 +145,6 @@ app.MapPut("/api/devices/smartwatch", (Smartwatch sw) =>
 {
     try
     {
-        deviceManager.EditDevice(sw);
         return Results.NoContent();
     }
     catch (Exception ex)
@@ -118,7 +157,6 @@ app.MapPut("/api/devices/embedded", (Embedded ed) =>
 {
     try
     {
-        deviceManager.EditDevice(ed);
         return Results.NoContent();
     }
     catch (Exception ex)
@@ -127,16 +165,16 @@ app.MapPut("/api/devices/embedded", (Embedded ed) =>
     }
 });
 
-app.MapDelete("/api/devices/{id}", (string id) =>
+app.MapDelete("/api/devices/{id}", (string id, IDeviceService deviceService) =>
 {
     try
     {
-        deviceManager.RemoveDeviceById(id);
+        deviceService.Delete(id);
         return Results.NoContent();
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error when deleting device");
+        return Results.Problem(ex.Message);
     }
 });
 
