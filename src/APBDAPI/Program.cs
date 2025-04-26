@@ -4,7 +4,7 @@ using APBD5;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("UniversityDatabase");
-builder.Services.AddTransient<IDeviceService,DeviceService >(
+builder.Services.AddTransient<IDeviceService, DeviceService>(
     _ => new DeviceService(connectionString));
 
 // Add services to the container.
@@ -21,8 +21,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-
 
 app.MapGet("/api/devices", (IDeviceService deviceService) =>
 {
@@ -53,128 +51,170 @@ app.MapGet("/api/devices/{id}", (string id, IDeviceService deviceService) =>
     }
 });
 
+
 app.MapPost("/api/devices", async (HttpRequest request, IDeviceService deviceService) =>
 {
-    try
+    string? contentType = request.ContentType?.ToLowerInvariant();
+    string? deviceType  = null;   
+    string? deviceJson  = null;    
+
+    switch (contentType)
     {
-        string? contentType = request.ContentType?.ToLower();
-        
-        if (contentType == "application/json")
+        case "application/json":
         {
             using var reader = new StreamReader(request.Body);
             string rawJson = await reader.ReadToEndAsync();
             var json = JsonNode.Parse(rawJson);
-            var deviceData = json?["typeValue"];
-            if (deviceData != null)
-            {
-                if (json?["deviceType"]?.ToString() == "PC")
-                {
-                    var pc = JsonSerializer.Deserialize<PersonalComputer>(deviceData.ToString());
-                    if (pc == null) return Results.BadRequest("Invalid PC data");
-                    bool created = deviceService.Create(pc);
-                    if (created)
-                        return Results.Created($"/api/devices/{pc.Id}", pc);
-                    else
-                        return Results.BadRequest("Device with this ID already exists.");
-                }
-                else if (json?["deviceType"]?.ToString() == "Smartwatch")
-                {
-                    var watch = JsonSerializer.Deserialize<Smartwatch>(deviceData.ToString());
-                    if (watch == null) return Results.BadRequest("Invalid Smartwatch data");
-                    bool created = deviceService.Create(watch);
-                    if (created)
-                        return Results.Created($"/api/devices/{watch.Id}", watch);
-                    else
-                        return Results.BadRequest("Device with this ID already exists.");
-                }
-                else if (json?["deviceType"]?.ToString() == "Embedded")
-                {
-                    var embedded = JsonSerializer.Deserialize<Embedded>(deviceData.ToString());
-                    if (embedded == null) return Results.BadRequest("Invalid Embedded device data");
-                    bool created = deviceService.Create(embedded);
-                    if (created)
-                        return Results.Created($"/api/devices/{embedded.Id}", embedded);
-                    else
-                        return Results.BadRequest("Device with this ID already exists.");
-                }
-                else
-                {
-                    return Results.BadRequest("Unknown device type");
-                }
-            }
-            return Results.BadRequest("Device data not provided.");
+            deviceType = json["deviceType"]?.ToString().ToUpperInvariant();
+            deviceJson = json["typeValue"]?.ToString();
+            if (deviceJson is null)
+                return Results.BadRequest("Device data not provided.");
+            break;
         }
-        else if (contentType == "text/plain")
+        case "text/plain":
         {
-            // Handle plain text input (similar logic as for JSON)
             using var reader = new StreamReader(request.Body);
-            string rawText = await reader.ReadToEndAsync();
+            string text = await reader.ReadToEndAsync();
+            if (string.IsNullOrWhiteSpace(text))
+                return Results.BadRequest("Empty text payload.");
+            int x = text.IndexOf('\n');
+            if (x < 0)
+                return Results.BadRequest();
+            //took this from the internet because i could not find another way around it :(
+            deviceType = text[..x].Trim().ToUpperInvariant();
+            deviceJson = text[(x + 1)..].Trim();
+            break;
+        }
+        default:
+            return Results.BadRequest("Unable to read");
+    }
+    if (string.IsNullOrWhiteSpace(deviceType) || string.IsNullOrWhiteSpace(deviceJson))
+        return Results.BadRequest("Not enoguh info");
+    var options = new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
-            // Process plain text data here
-            // (You can adjust how you handle plain text depending on your needs)
-            var device = new PersonalComputer(rawText, rawText, true, "Windows");
-            deviceService.Create(device);
+    switch (deviceType)
+    {
+        case "PC":
+        {
+            var pc = JsonSerializer.Deserialize<PersonalComputer>(deviceJson, options);
+            if (pc is null) return Results.BadRequest("Invalid PC data");
 
-            return Results.Created($"/api/devices/{device.Id}", device);
+            return deviceService.Create(pc)
+                ? Results.Created($"/api/devices/{pc.Id}", pc)
+                : Results.BadRequest("Device ID already exists");
+        }
+        case "SW":
+        {
+            var watch = JsonSerializer.Deserialize<Smartwatch>(deviceJson, options);
+            if (watch is null) return Results.BadRequest("Invalid Smartwatch data");
+
+            return deviceService.Create(watch)
+                ? Results.Created($"/api/devices/{watch.Id}", watch)
+                : Results.BadRequest("Device ID already exists");
+        }
+        case "ED":
+        {
+            var em = JsonSerializer.Deserialize<Embedded>(deviceJson, options);
+            if (em is null) return Results.BadRequest("Invalid ED data");
+
+            return deviceService.Create(em)
+                ? Results.Created($"/api/devices/{em.Id}", em)
+                : Results.BadRequest("Device ID already exists");
+        }
+        default:
+            return Results.BadRequest("Unknown device");
+    }
+})
+.Accepts<string>("application/json", ["text/plain"]);
+
+
+
+app.MapPut("/api/devices/{id}", async (string id, HttpRequest request, IDeviceService deviceService) =>
+{
+    try
+    {
+        string? contentType = request.ContentType?.ToLower();
+
+        if (contentType != "application/json")
+        {
+            return Results.BadRequest("Unsupported type");
+        }
+
+        using var reader = new StreamReader(request.Body);
+        string rawJson = await reader.ReadToEndAsync();
+        var json = JsonNode.Parse(rawJson);
+        var deviceData = json?["typeValue"];
+        var deviceType = json?["deviceType"]?.ToString();
+
+        if (deviceData == null || string.IsNullOrEmpty(deviceType))
+        {
+            return Results.BadRequest("data is missing");
+        }
+
+        Device device = null;
+
+        if (deviceType == "PC")
+        {
+            device = JsonSerializer.Deserialize<PersonalComputer>(deviceData.ToString());
+        }
+        else if (deviceType == "SW")
+        {
+            device = JsonSerializer.Deserialize<Smartwatch>(deviceData.ToString());
+        }
+        else if (deviceType == "ED")
+        {
+            device = JsonSerializer.Deserialize<Embedded>(deviceData.ToString());
         }
         else
         {
-            return Results.BadRequest("Unsupported content type");
+            return Results.BadRequest("unknown device type");
+        }
+
+        if (device == null)
+        {
+            return Results.BadRequest("Invalid device data");
+        }
+
+        device.Id = id;
+
+        bool updated = deviceService.Update(device);
+        if (updated)
+        {
+            return Results.NoContent();  
+        }
+        else
+        {
+            return Results.BadRequest("Failed to update");
         }
     }
     catch (Exception ex)
     {
-        return Results.Problem("Error processing request: " + ex.Message);
-    }
-})
-.Accepts<string>("application/json", "text/plain"); 
-
-app.MapPut("/api/devices/pc", (PersonalComputer pc) =>
-{
-    try
-    {
-        return Results.NoContent();
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem("Error when updating device");
+        return Results.Problem("error", ex.Message);
     }
 });
 
-app.MapPut("/api/devices/smartwatch", (Smartwatch sw) =>
-{
-    try
-    {
-        return Results.NoContent();
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem("Error when updating device");
-    }
-});
 
-app.MapPut("/api/devices/embedded", (Embedded ed) =>
-{
-    try
-    {
-        return Results.NoContent();
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem("Error when updating device");
-    }
-});
+
+
 
 app.MapDelete("/api/devices/{id}", (string id, IDeviceService deviceService) =>
 {
     try
     {
-        deviceService.Delete(id);
+        bool deleted = deviceService.Delete(id);
+        if (deleted)
         return Results.NoContent();
+        else
+        {
+            return Results.BadRequest("Couldnt delete");
+        }
     }
     catch (Exception ex)
     {
-        return Results.Problem(ex.Message);
+        return Results.Problem("error", ex.Message);
     }
 });
 
