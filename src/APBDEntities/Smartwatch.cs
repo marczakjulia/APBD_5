@@ -24,6 +24,7 @@ namespace APBD5
                 }
             }
         }
+        public Smartwatch() { }
 
         public Smartwatch(string id, string name, bool isEnabled, int batteryLevel)
             : base(id, name, isEnabled)

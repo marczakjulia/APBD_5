@@ -54,173 +54,132 @@ public class DeviceService : IDeviceService
     }
 
     //works
-   public bool Create(Device device)
-{
-    if (GetDeviceById(device.Id) is not null)
-        return false;
-
-    const string sql = "INSERT INTO Device (Id, Name, IsEnabled) VALUES (@Id, @Name, @IsEnabled)";
-    using (var connection = new SqlConnection(_connectionString))
+    public bool Create(Device device)
     {
-        connection.Open();
-        //i have used transaction like on utp was shown last year, to make sure that no commits to the databse are made unless all arguments are okay
-        //this allows for all the checking conditions that were earlier implemented when creating the project. hence nothing will be added to the device nor one 
-        //of their types unless all arugments fit the requirements 
-        // https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/local-transactions
-        using (var transaction = connection.BeginTransaction())
+        //function to validate beforehand hence no transaction now used 
+        ValidateDevice(device);
+        
+        string prefix = device switch
         {
-            try
+            Smartwatch _        => "SW-",
+            PersonalComputer _  => "P-",
+            Embedded _          => "ED-",
+            _ => throw new ArgumentException("Unknown type", nameof(device))
+        };
+        int counter = 1;
+        string newId;
+        //creating my id in a way that i just check which next is null - keeps it neat so i have all in order
+        //not like SW-1O, SW-2445 ... if i used a counter of come sorts to assign values 
+        while (true)
+        {
+            newId = $"{prefix}{counter}";
+            if (GetDeviceById(newId) == null)
+                break;
+            counter++;
+        }
+        device.Id = newId;
+        using (SqlConnection connection = new SqlConnection(_connectionString))
+        {
+            connection.Open();
+            const string sql = "INSERT INTO Device (Id, Name, IsEnabled) VALUES (@Id, @Name, @IsEnabled)";
+            SqlCommand command = new SqlCommand(sql, connection);
+            command.Parameters.AddWithValue("@Id", device.Id);
+            command.Parameters.AddWithValue("@Name", device.Name);
+            command.Parameters.AddWithValue("@IsEnabled", device.IsEnabled);
+            if (command.ExecuteNonQuery() != 1)
+                throw new Exception("Failed to insert device");
+                
+            if (device is Smartwatch sw)
             {
-                using (var command = new SqlCommand(sql, connection, transaction))
-                {
-                    command.Parameters.AddWithValue("@Id", device.Id);
-                    command.Parameters.AddWithValue("@Name", device.Name);
-                    command.Parameters.AddWithValue("@IsEnabled", device.IsEnabled);
-
-                    if (command.ExecuteNonQuery() == 0)
-                        throw new Exception("failed to insert device");
-                }
-                bool result = device switch
-                {
-                    Smartwatch sw => CreateSmartwatchDetails(sw, connection, transaction),
-                    PersonalComputer pc => CreatePersonalComputerDetails(pc, connection, transaction),
-                    Embedded ed => CreateEmbeddedDetails(ed, connection, transaction)
-                };
-                if (!result)
-                {
-                    throw new Exception("failed to insert details");
-                }
-                transaction.Commit();
-                return true;
+                const string swSql =
+                    "INSERT INTO Smartwatch (BatteryPercentage, DeviceId) VALUES (@BatteryPercentage, @Id)";
+                using var swCmd = new SqlCommand(swSql, connection);
+                swCmd.Parameters.AddWithValue("@BatteryPercentage", sw.BatteryLevel);
+                swCmd.Parameters.AddWithValue("@Id", device.Id);
+                if (swCmd.ExecuteNonQuery() != 1)
+                    throw new Exception("Failed to insert smartwatch");
             }
-            catch (Exception ex)
+            else if (device is PersonalComputer pc)
             {
-                transaction.Rollback();
-                Console.WriteLine("Error adding device");
-                return false;
+                const string pcSql =
+                    "INSERT INTO PersonalComputer (OperationSystem, DeviceId) VALUES (@OperationSystem, @Id)";
+                using var pcCmd = new SqlCommand(pcSql, connection);
+                pcCmd.Parameters.AddWithValue("@OperationSystem", pc.OperatingSystem);
+                pcCmd.Parameters.AddWithValue("@Id", device.Id);
+                if (pcCmd.ExecuteNonQuery() != 1)
+                    throw new Exception("Failed to insert pc");
+            }
+            else if (device is Embedded e)
+            {
+                const string edSql = "INSERT INTO Embedded (IpAddress, NetworkName, DeviceId) VALUES (@IpAddress, @NetworkName, @Id)";
+                using var edCmd = new SqlCommand(edSql, connection);
+                edCmd.Parameters.AddWithValue("@IpAddress", e.IpAddress);
+                edCmd.Parameters.AddWithValue("@NetworkName", e.NetworkName);
+                edCmd.Parameters.AddWithValue("@Id", device.Id);
+                if (edCmd.ExecuteNonQuery() != 1)
+                    throw new Exception("Failed to insert embedded");
             }
         }
+        return true;
     }
-}
-
-
-private bool CreateSmartwatchDetails(Smartwatch sw, SqlConnection connection, SqlTransaction transaction)
-{
-    int count;
-    string query = "INSERT INTO Smartwatch (DeviceId, BatteryPercentage) VALUES (@DeviceId, @BatteryPercentage)";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", sw.Id);
-    command.Parameters.AddWithValue("@BatteryPercentage", sw.BatteryLevel);
-    count = command.ExecuteNonQuery();
-    return count > 0;
-}
-
-private bool CreatePersonalComputerDetails(PersonalComputer pc, SqlConnection connection, SqlTransaction transaction)
-{
-    int count = -1;
-    string query = "INSERT INTO PersonalComputer (OperationSystem, DeviceID) VALUES (@OperationSystem, @DeviceId)";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", pc.Id);
-    command.Parameters.AddWithValue("@OperationSystem", pc.OperatingSystem);
-    count = command.ExecuteNonQuery();
-    return count == -1;
-}
-
-private bool CreateEmbeddedDetails(Embedded ed, SqlConnection connection, SqlTransaction transaction)
-{
-    int count;
-    string query = "INSERT INTO Embedded (IpAddress, NetworkName, DeviceID) VALUES (@IpAddress, @NetworkName, @DeviceId)";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", ed.Id);
-    command.Parameters.AddWithValue("@IpAddress", ed.IpAddress);
-    command.Parameters.AddWithValue("@NetworkName", ed.NetworkName);
-    count = command.ExecuteNonQuery();
-    return count > 0;
-}
-
+    
     
 public bool Update(Device device)
 {
-    if (device is null) throw new ArgumentNullException(nameof(device));
-
-    const string sqlUpdateDevice = @"UPDATE Device SET Name = @Name, IsEnabled = @IsEnabled WHERE Id = @Id";
-
-    using var connection = new SqlConnection(_connectionString);
-    connection.Open();
-    using var transaction = connection.BeginTransaction();
-    try
+    ValidateDevice(device);
+    const string sqlDevice = @" UPDATE Device SET Name = @Name, IsEnabled = @IsEnabled WHERE Id = @Id";
+    using (SqlConnection connection = new SqlConnection(_connectionString))
     {
-        using var command = new SqlCommand(sqlUpdateDevice, connection, transaction);
+        connection.Open();
+        SqlCommand command = new SqlCommand(sqlDevice, connection);
         command.Parameters.AddWithValue("@Id", device.Id);
         command.Parameters.AddWithValue("@Name", device.Name);
         command.Parameters.AddWithValue("@IsEnabled", device.IsEnabled);
-        
-        int rowsAffected = command.ExecuteNonQuery();
-        if (rowsAffected == 0)
+        int rows = command.ExecuteNonQuery();
+        if (rows == 0)
+            return false;
+        bool goodDetails = device switch
         {
-            throw new Exception("Device not found");
-        }
-        bool result = device switch
-        {
-            Smartwatch sw => UpdateSmartwatchDetails(sw, connection, transaction),
-            PersonalComputer pc => UpdatePersonalComputerDetails(pc, connection, transaction),
-            Embedded ed => UpdateEmbeddedDetails(ed, connection, transaction),
+            Smartwatch sw => UpdateSmartwatchDetails(sw, connection),
+            PersonalComputer pc => UpdatePersonalComputerDetails(pc, connection),
+            Embedded ed => UpdateEmbeddedDetails(ed, connection),
+            _ => throw new ArgumentException("Unknown device type", nameof(device))
         };
 
-        if (!result)
-        {
-            transaction.Rollback();
-            return false;
-        }
-
-        transaction.Commit();
-        return true;
-    }
-    catch (Exception ex)
-    {
-        transaction.Rollback();
-        Console.WriteLine($"Error updating device {ex.Message}");
-        return false;
+        return goodDetails;
     }
 }
 
-private bool UpdateSmartwatchDetails(Smartwatch sw, SqlConnection connection, SqlTransaction transaction)
+private bool UpdateSmartwatchDetails(Smartwatch sw, SqlConnection conn)
 {
-    int count;
-    string query = "UPDATE Smartwatch SET BatteryPercentage = @BatteryPercentage WHERE DeviceId = @DeviceId";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", sw.Id);
-    command.Parameters.AddWithValue("@BatteryPercentage", sw.BatteryLevel);
-    count = command.ExecuteNonQuery();
-    return count > 0;
+    const string sql = @"UPDATE Smartwatch SET BatteryPercentage = @BatteryLevel WHERE DeviceId = @Id";
+    using var cmd = new SqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("@Id",      sw.Id);
+    cmd.Parameters.AddWithValue("@BatteryLevel", sw.BatteryLevel);
+    return cmd.ExecuteNonQuery() == 1;
 }
 
-private bool UpdatePersonalComputerDetails(PersonalComputer pc, SqlConnection connection, SqlTransaction transaction)
+private bool UpdatePersonalComputerDetails(PersonalComputer pc, SqlConnection conn)
 {
-    int count;
-    string query = "UPDATE PersonalComputer SET OperationSystem = @OperationSystem WHERE DeviceId = @DeviceId";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", pc.Id);
-    command.Parameters.AddWithValue("@OperationSystem", pc.OperatingSystem);
-    count = command.ExecuteNonQuery();
-    return count > 0;
+    const string sql = @"UPDATE PersonalComputer SET OperationSystem = @OperationSystem WHERE DeviceId = @Id";
+    using var cmd = new SqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("@Id", pc.Id);
+    cmd.Parameters.AddWithValue("@OperationSystem", pc.OperatingSystem);
+    return cmd.ExecuteNonQuery() == 1;
 }
 
-private bool UpdateEmbeddedDetails(Embedded ed, SqlConnection connection, SqlTransaction transaction)
+private bool UpdateEmbeddedDetails(Embedded ed, SqlConnection conn)
 {
-    int count;
-    string query = "UPDATE Embedded SET IpAddress = @IpAddress, NetworkName = @NetworkName WHERE DeviceId = @DeviceId";
-    using var command = new SqlCommand(query, connection, transaction);
-    command.Parameters.AddWithValue("@DeviceId", ed.Id);
-    command.Parameters.AddWithValue("@IpAddress", ed.IpAddress);
-    command.Parameters.AddWithValue("@NetworkName", ed.NetworkName);
-    count = command.ExecuteNonQuery();
-    return count > 0;
+    const string sql = @"UPDATE Embedded SET IpAddress   = @IpAddress, NetworkName = @NetworkName WHERE DeviceId = @Id";
+    using var cmd = new SqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("@Id",  ed.Id);
+    cmd.Parameters.AddWithValue("@IpAddress",  ed.IpAddress);
+    cmd.Parameters.AddWithValue("@NetworkName", ed.NetworkName);
+    return cmd.ExecuteNonQuery() == 1;
 }
 
 
-
-//works
+//delete on cascade in sql
     public bool Delete(string id)
     {
         if (string.IsNullOrWhiteSpace(id)) return false;
@@ -239,5 +198,34 @@ private bool UpdateEmbeddedDetails(Embedded ed, SqlConnection connection, SqlTra
         return count > 0;
     }
 
-   
+    private void ValidateDevice(Device device)
+    {
+        if (device == null)
+            throw new ArgumentNullException(nameof(device));
+        if (string.IsNullOrWhiteSpace(device.Name))
+            throw new ArgumentException("name is required", nameof(device.Name));
+
+        switch (device)
+        {
+            case Smartwatch sw:
+                if (sw.BatteryLevel < 0 || sw.BatteryLevel > 100)
+                    throw new ArgumentException("battery level invalid", nameof(sw.BatteryLevel));
+                break;
+
+            case PersonalComputer pc:
+                if (string.IsNullOrWhiteSpace(pc.OperatingSystem))
+                    throw new ArgumentException("OS is required for PC", nameof(pc.OperatingSystem));
+                break;
+
+            case Embedded ed:
+                if (!System.Net.IPAddress.TryParse(ed.IpAddress, out _))
+                    throw new ArgumentException("Invalid IP address", nameof(ed.IpAddress));
+                if (string.IsNullOrWhiteSpace(ed.NetworkName))
+                    throw new ArgumentException("network is required", nameof(ed.NetworkName));
+                break;
+
+            default:
+                throw new ArgumentException("unknown device", nameof(device));
+        }
+    }
 }

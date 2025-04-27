@@ -26,6 +26,7 @@ namespace APBD5
             get => _isEnabled;
             set => _isEnabled = value;
         }
+        protected Device() { }
 
         public Device(string id, string name, bool isEnabled)
         {

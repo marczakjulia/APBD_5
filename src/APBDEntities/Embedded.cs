@@ -32,6 +32,8 @@ namespace APBD5
         }
 
         private bool _isConnected = false;
+        
+        public Embedded() { }
 
         public Embedded(string id, string name, bool isEnabled, string ipAddress, string networkName)
             : base(id, name, isEnabled)
