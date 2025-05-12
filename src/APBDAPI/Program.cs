@@ -99,7 +99,7 @@ app.MapPost("/api/devices", async (HttpRequest request, IDeviceService deviceSer
     {
         case "PC":
         {
-            var pc = JsonSerializer.Deserialize<PersonalComputer>(deviceJson, options);
+            var pc = JsonSerializer.Deserialize<PersonalComputerDTO>(deviceJson, options);
             if (pc is null) return Results.BadRequest("Invalid PC data");
 
             return deviceService.Create(pc)
@@ -108,7 +108,7 @@ app.MapPost("/api/devices", async (HttpRequest request, IDeviceService deviceSer
         }
         case "SW":
         {
-            var watch = JsonSerializer.Deserialize<Smartwatch>(deviceJson, options);
+            var watch = JsonSerializer.Deserialize<SmartwatchDTO>(deviceJson, options);
             if (watch is null) return Results.BadRequest("Invalid Smartwatch data");
 
             return deviceService.Create(watch)
@@ -117,7 +117,7 @@ app.MapPost("/api/devices", async (HttpRequest request, IDeviceService deviceSer
         }
         case "ED":
         {
-            var em = JsonSerializer.Deserialize<Embedded>(deviceJson, options);
+            var em = JsonSerializer.Deserialize<EmbeddedDTO>(deviceJson, options);
             if (em is null) return Results.BadRequest("Invalid ED data");
 
             return deviceService.Create(em)
@@ -154,19 +154,19 @@ app.MapPut("/api/devices/{id}", async (string id, HttpRequest request, IDeviceSe
             return Results.BadRequest("data is missing");
         }
 
-        Device device = null;
+        DeviceDTO device = null;
 
         if (deviceType == "PC")
         {
-            device = JsonSerializer.Deserialize<PersonalComputer>(deviceData.ToString());
+            device = JsonSerializer.Deserialize<PersonalComputerDTO>(deviceData.ToString());
         }
         else if (deviceType == "SW")
         {
-            device = JsonSerializer.Deserialize<Smartwatch>(deviceData.ToString());
+            device = JsonSerializer.Deserialize<SmartwatchDTO>(deviceData.ToString());
         }
         else if (deviceType == "ED")
         {
-            device = JsonSerializer.Deserialize<Embedded>(deviceData.ToString());
+            device = JsonSerializer.Deserialize<EmbeddedDTO>(deviceData.ToString());
         }
         else
         {

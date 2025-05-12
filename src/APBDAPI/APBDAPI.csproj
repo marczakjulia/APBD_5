@@ -12,8 +12,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\APBDRepository\APBDRepository.csproj" />
       <ProjectReference Include="..\APBDEntities\APBDEntities.csproj" />
       <ProjectReference Include="..\APBDLogic \APBDLogic.csproj" />
+      <ProjectReference Include="..\APBDRepository\APBDRepository.csproj" />
     </ItemGroup>
 
 </Project>

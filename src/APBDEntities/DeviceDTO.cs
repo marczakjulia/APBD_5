@@ -1,4 +1,5 @@
 namespace APBD5;
+using System.ComponentModel.DataAnnotations;
 
 /// <summary>
 /// Class which kinds works like Device but for the DataBase, since the Device is abstract
@@ -9,4 +10,5 @@ public class DeviceDTO
     public string Id { get; set; }
     public string Name { get; set; }
     public bool IsEnabled { get; set; }
+    public byte[] RowVersion { get; set; }
 }
