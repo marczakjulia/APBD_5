@@ -3,11 +3,11 @@ using Microsoft.Data.SqlClient;
 
 namespace APBD5;
 
-public class DeviceService : IDeviceService
+public class DeviceRepository
 {
     private readonly string _connectionString;
 
-    public DeviceService(string connectionString)
+    public DeviceRepository(string connectionString)
     {
         _connectionString = connectionString;
     }
@@ -59,29 +59,6 @@ public class DeviceService : IDeviceService
     //works
    public bool Create(DeviceDTO device) 
    {
-    DeviceValidator validator = new DeviceValidator();
-    validator.ValidateDevice(device);
-    
-    string prefix = device switch
-    {
-        SmartwatchDTO _        => "SW-",
-        PersonalComputerDTO _  => "P-",
-        EmbeddedDTO _          => "ED-",
-        _ => throw new ArgumentException("Unknown device type", nameof(device))
-    };
-    
-
-    int counter = 1;
-    string newId;
-    while (true)
-    {
-        newId = $"{prefix}{counter}";
-        if (GetDeviceById(newId) == null)
-            break;
-        counter++;
-    }
-    device.Id = newId;
-    
     using var connection = new SqlConnection(_connectionString);
     connection.Open();
     using var transaction = connection.BeginTransaction();
@@ -134,8 +111,6 @@ public class DeviceService : IDeviceService
 public bool Update(DeviceDTO deviceDto)
 {
     if (deviceDto == null) throw new ArgumentNullException(nameof(deviceDto));
-    DeviceValidator validator = new DeviceValidator();
-    validator.ValidateDevice(deviceDto);
     const string sqlUpdateDevice = @"UPDATE Device SET Name = @Name, IsEnabled = @IsEnabled WHERE Id = @Id AND RowVersion = @RowVersion";
     using var connection = new SqlConnection(_connectionString);
     connection.Open();

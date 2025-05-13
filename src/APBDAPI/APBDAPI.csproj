@@ -15,7 +15,7 @@
       <ProjectReference Include="..\..\APBDRepository\APBDRepository.csproj" />
       <ProjectReference Include="..\APBDEntities\APBDEntities.csproj" />
       <ProjectReference Include="..\APBDLogic \APBDLogic.csproj" />
-      <ProjectReference Include="..\APBDRepository\APBDRepository.csproj" />
+      <ProjectReference Include="..\APBDRepo\APBDRepo.csproj" />
     </ItemGroup>
 
 </Project>

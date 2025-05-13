@@ -6,7 +6,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APBDLogic", "src\APBDLogic 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APBDAPI", "src\APBDAPI\APBDAPI.csproj", "{E2F507AA-9BB1-4313-9F49-BD2622060139}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APBDRepository", "src\APBDRepository\APBDRepository.csproj", "{8C349A67-E0A9-4B4A-B092-F0F1B0E980E6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APBDRepo", "src\APBDRepo\APBDRepo.csproj", "{8C349A67-E0A9-4B4A-B092-F0F1B0E980E6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

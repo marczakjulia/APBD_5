@@ -4,8 +4,8 @@ using APBD5;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("UniversityDatabase");
-builder.Services.AddTransient<IDeviceService, DeviceService>(
-    _ => new DeviceService(connectionString));
+builder.Services.AddTransient<DeviceRepository>(x => new DeviceRepository(connectionString));
+builder.Services.AddTransient<IDeviceService, DeviceService>();
 
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();

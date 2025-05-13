@@ -9,10 +9,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\APBDEntities\APBDEntities.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.1" />
+      <ProjectReference Include="..\APBDRepo\APBDRepo.csproj" />
     </ItemGroup>
 
 </Project>
