@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 
 namespace APBD5;
 
-public class DeviceRepository
+public class DeviceRepository: IDeviceRepository
 {
     private readonly string _connectionString;
 
